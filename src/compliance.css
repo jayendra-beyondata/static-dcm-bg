@@ -1,0 +1,17 @@
+.summary-cell.compliance span { font-size: 11px; letter-spacing: .04em; }
+.summary-cell.compliance-high span { color: #159879; }
+.summary-cell.compliance-medium span { color: #bd8a26; }
+.summary-cell.compliance-low span { color: #d34f5d; }
+.summary-cell.compliance { pointer-events: none; cursor: default; }
+.document-control { display: none; }
+.control-strip { display: none; }
+.sidebar-nav-static .sidebar-nav-item:not(.bg-nav-item) { display: none; }
+.sidebar-nav-static .bg-nav-item { display: flex; cursor: pointer; }
+.header-center { margin-left: 0; }
+.v2-clause-table thead .v2-new-template-header { background: #16181e; }
+.v2-clause-table tbody .v2-new-template-clause { background: #1d2030 !important; color: #e4e8f2; }
+.v2-new-template-clause strong { color: #e4e8f2 !important; }
+.v2-new-template-clause span { color: #5f6480 !important; }
+.v2-baseline-cell { min-height: 92px; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 9px 8px; color: #7e87a1; background: #181b25; border: 1px dashed #2a2d3e; border-radius: 5px; }
+.v2-baseline-cell span { color: #c5cae0; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.v2-baseline-cell small { color: #5f6480; font-size: 8px; }
