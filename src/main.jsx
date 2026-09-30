@@ -211,6 +211,14 @@ function backwardMatchEntries(record, metrics) {
   ];
 }
 
+function backwardV2Clauses(record, metrics) {
+  return backwardMatchEntries(record, metrics).map((entry, index) => ({
+    id: `Backward-Clause-${index + 1}`,
+    title: entry.clause,
+    cells: { 'New Template': [entry.status === 'MATCHED' ? 'match' : 'missing', compactClause(entry.clauseText)] },
+  }));
+}
+
 function realV2Clauses(record, metrics) {
   const validation = validationFor(record);
   const entries = v1MatchEntries(record, metrics);
@@ -252,7 +260,7 @@ function TemplateMatchSummary({ entries, totalClauses, checkedClauses = totalCla
 function BackwardTemplateMatchSummary({ entries, checkedClauses }) {
   const matched = entries.filter(entry => entry.status === 'MATCHED').length;
   const totalClauses = entries.length;
-  return <section className="template-match-summary"><div className="template-match-head"><div><h2>Standard Template clause summary</h2><p>Compare {checkedClauses} new-template clauses against all {totalClauses} standard-template clauses.</p></div><span>{matched}/{checkedClauses} new-template clauses matched · {totalClauses} standard total</span></div><div className="template-match-stats template-match-stats-backward"><div><small>STANDARD TEMPLATE</small><strong>{totalClauses}</strong><span>Total clauses</span></div><div><small>NEW TEMPLATE CHECKED</small><strong>{checkedClauses}</strong><span>Clauses compared</span></div><div><small>MATCHED IN NEW TEMPLATE</small><strong>{matched}</strong><span>Clauses aligned</span></div><div><small>STANDARD-ONLY GAPS</small><strong>{totalClauses - matched}</strong><span>Not found in new template</span></div></div><div className="template-match-list">{entries.map((entry, index) => <div className={`template-match-row template-match-${entry.displayStatus || 'missing'}`} key={`${entry.clause}-${index}`}><div className="template-match-copy"><strong>{entry.clause}</strong><small>{compactClause(entry.clauseText)}</small></div><span className="template-match-count">{entry.standardMatches} found</span></div>)}</div></section>;
+  return <section className="template-match-summary"><div className="template-match-head"><div><h2>New Template clause summary</h2><p>Standard-template clauses checked against the New Template.</p></div><span>{matched}/{checkedClauses} new-template clauses matched · {totalClauses} clauses checked</span></div><div className="template-match-stats template-match-stats-backward"><div><small>NEW TEMPLATE</small><strong>{checkedClauses}</strong><span>Clauses checked</span></div><div><small>ALL CLAUSES</small><strong>{totalClauses}</strong><span>Reference clauses</span></div><div><small>MATCHED</small><strong>{matched}</strong><span>Clauses aligned</span></div><div><small>NOT MATCHED</small><strong>{totalClauses - matched}</strong><span>Additional clause gaps</span></div></div><div className="template-match-list">{entries.map((entry, index) => <div className={`template-match-row template-match-${entry.displayStatus || 'missing'}`} key={`${entry.clause}-${index}`}><div className="template-match-copy"><strong>{entry.clause}</strong><small>{compactClause(entry.clauseText)}</small></div><span className="template-match-count">{entry.standardMatches} found</span></div>)}</div></section>;
 }
 
 function App() {
@@ -305,20 +313,22 @@ function ComparisonV2({ bgType, initialDirection, record, metrics }) {
   const [traceDirection, setTraceDirection] = useState(initialDirection);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const directionLabel = traceDirection === 'forward' ? 'Forward tracing' : 'Backward tracing';
-  const clauses = realV2Clauses(record, metrics);
-  const summaryColumns = traceDirection === 'backward' ? ['New Template', 'Standard Template'] : v2Columns.slice(1);
-  const matrixColumns = traceDirection === 'backward' ? v2Columns.slice(0, 2) : v2Columns;
+  const clauses = traceDirection === 'backward' ? backwardV2Clauses(record, metrics) : realV2Clauses(record, metrics);
+  const summaryColumns = traceDirection === 'backward' ? ['New Template'] : v2Columns.slice(1);
+  const matrixColumns = traceDirection === 'backward' ? ['New Template'] : v2Columns;
   return <>
     <div className="page-top"><div><div className="eyebrow">DOCUMENT ANALYSIS · V2</div><h1>Bank Guarantee comparison v2</h1><p>Review every template in one row, then compare clause status and match percentage below.</p></div><div className="page-actions"><button className="outline-button"><Icon name="refresh" size={15}/> Refresh</button><button className="blue-button"><Icon name="download" size={15}/> Export comparison</button></div></div>
-    <div className="top-tabs"><button className={traceDirection === 'forward' ? 'active' : ''} onClick={() => { setTraceDirection('forward'); setSelectedTemplate(null); }}><span className="tab-index">01</span><span><strong>Forward tracing</strong><small>New Template → Standard Template</small></span></button><button className={traceDirection === 'backward' ? 'active' : ''} onClick={() => { setTraceDirection('backward'); setSelectedTemplate(null); }}><span className="tab-index">02</span><span><strong>Backward tracing</strong><small>Standard Template → New Template</small></span></button></div>
-    <TemplateMatchSummary entries={v1MatchEntries(record, metrics)} totalClauses={clauses.length} />
+    <div className="top-tabs"><button className={traceDirection === 'forward' ? 'active' : ''} onClick={() => { setTraceDirection('forward'); setSelectedTemplate(null); }}><span className="tab-index">01</span><span><strong>Forward tracing</strong><small>New Template → reference clauses</small></span></button><button className={traceDirection === 'backward' ? 'active' : ''} onClick={() => { setTraceDirection('backward'); setSelectedTemplate(null); }}><span className="tab-index">02</span><span><strong>Backward tracing</strong><small>Reference clauses → New Template</small></span></button></div>
+    {traceDirection === 'backward' ? <BackwardTemplateMatchSummary entries={backwardMatchEntries(record, metrics)} checkedClauses={Object.keys(validationFor(record).detailed_comparison || {}).length || metrics.total} /> : <TemplateMatchSummary entries={v1MatchEntries(record, metrics)} totalClauses={clauses.length} />}
     <section className="v2-summary-card"><div className="v2-summary-title"><div><h2>{directionLabel} summary</h2><p>{record.fileName} · real validation findings grouped in the v2 comparison layout.</p></div><span>{bgType} · {clauses.length} clauses</span></div><div className="v2-summary-scroll"><table className="v2-summary-table"><thead><tr><th>COMPARISON</th>{summaryColumns.map((column, index) => <th key={column} className={column === 'Standard Template' ? 'v2-standard-col' : ''}><span>{column === 'Standard Template' ? 'REFERENCE' : traceDirection === 'backward' ? 'SUBMITTED' : 'APPROVED PRECEDENT'}</span><strong>{templateLabels[column] || column}</strong></th>)}</tr></thead><tbody><tr><th><strong>Clause status</strong><span>Click a column to inspect</span></th>{summaryColumns.map(column => { const stats = getV2Stats(column, clauses); return <td key={column}><button className={`v2-summary-cell ${selectedTemplate === column ? 'selected' : ''}`} onClick={() => setSelectedTemplate(column)}><div className="v2-metric-row"><span className="v2-metric-match">Matched <b>{stats.match}</b></span><span className="v2-metric-modified">Modified <b>{stats.modified}</b></span><span className="v2-metric-missing">Missing <b>{stats.missing}</b></span><span className="v2-metric-added">Added <b>{stats.added}</b></span></div><div className="v2-score-line"><strong>{stats.percentage}%</strong><span>match</span><i><b style={{ width: `${stats.percentage}%` }}></b></i></div></button></td>; })}</tr></tbody></table></div></section>
     {selectedTemplate ? <V2ClauseMatrix selectedTemplate={selectedTemplate} columns={matrixColumns} clauses={clauses} /> : <div className="v2-empty"><Icon name="grid" size={21}/><span>Click any template column above to display its clause-level comparison.</span></div>}
   </>;
 }
 
 function V2ClauseMatrix({ selectedTemplate, columns, clauses }) {
-  return <section className="v2-clause-section"><div className="v2-clause-head"><div><h2>Clause comparison</h2><p>{templateLabels[selectedTemplate] || selectedTemplate} selected · green matched, yellow modified, red missing or not matched.</p></div><span className="v2-selected-label">{getV2Stats(selectedTemplate, clauses).percentage}% total match</span></div><div className="v2-clause-scroll"><table className="v2-clause-table"><thead><tr><th className="v2-new-template-header"><span>New Template</span></th>{columns.slice(1).map(column => { const stats = getV2Stats(column, clauses); return <th key={column} className={column === selectedTemplate ? 'selected-column' : ''}><span>{templateLabels[column] || column}</span><strong>{stats.percentage}%</strong><small>{stats.match}/{stats.total} matched</small></th>; })}</tr></thead><tbody>{clauses.map(clause => <tr key={clause.id}><th className="v2-new-template-clause"><span>{clause.id}</span><strong>{clause.cells['New Template'][1]}</strong></th>{columns.slice(1).map(column => { const [status, text] = clause.cells[column]; const matchPercentage = status === 'match' ? 100 : status === 'modified' ? 60 : status === 'added' ? 40 : 0; return <td key={column} className={`v2-status-cell v2-${status} ${column === selectedTemplate ? 'selected-column' : ''}`}><strong>{text}</strong><small>{status === 'match' ? 'MATCHED' : status === 'modified' ? 'MODIFIED' : status === 'missing' ? 'MISSING' : 'ADDED'} · {matchPercentage}%</small></td>; })}</tr>)}</tbody></table></div></section>;
+  const backwardOnly = columns.length === 1;
+  const comparisonColumns = backwardOnly ? ['New Template'] : columns.slice(1);
+  return <section className="v2-clause-section"><div className="v2-clause-head"><div><h2>Clause comparison</h2><p>{templateLabels[selectedTemplate] || selectedTemplate} selected · green matched, yellow modified, red missing or not matched.</p></div><span className="v2-selected-label">{getV2Stats(selectedTemplate, clauses).percentage}% total match</span></div><div className="v2-clause-scroll"><table className="v2-clause-table"><thead><tr><th className="v2-new-template-header"><span>{backwardOnly ? 'CLAUSE' : 'New Template'}</span></th>{comparisonColumns.map(column => { const stats = getV2Stats(column, clauses); return <th key={column} className={column === selectedTemplate ? 'selected-column' : ''}><span>{templateLabels[column] || column}</span><strong>{stats.percentage}%</strong><small>{stats.match}/{stats.total} matched</small></th>; })}</tr></thead><tbody>{clauses.map(clause => <tr key={clause.id}><th className="v2-new-template-clause"><span>{clause.id}</span><strong>{backwardOnly ? clause.title : clause.cells['New Template'][1]}</strong></th>{comparisonColumns.map(column => { const [status, text] = clause.cells[column]; const matchPercentage = status === 'match' ? 100 : status === 'modified' ? 60 : status === 'added' ? 40 : 0; return <td key={column} className={`v2-status-cell v2-${status} ${column === selectedTemplate ? 'selected-column' : ''}`}><strong>{text}</strong><small>{status === 'match' ? 'MATCHED' : status === 'modified' ? 'MODIFIED' : status === 'missing' ? 'MISSING' : 'ADDED'} · {matchPercentage}%</small></td>; })}</tr>)}</tbody></table></div></section>;
 }
 
 function ComparisonSummary({ record, metrics, validation, direction, selected, onSelect }) {
@@ -337,7 +347,9 @@ function ComparisonSummary({ record, metrics, validation, direction, selected, o
   ]);
   const valuesFor = (rowId, columnId) => {
     if (columnId === 'submitted') {
-      return { aligned: `${metrics.aligned} findings`, modified: `${metrics.modified} clauses`, missing: `${metrics.missing} clauses`, result: `${metrics.score}% · ${metrics.risk}` }[rowId];
+      return direction === 'backward'
+        ? { aligned: `${backwardMatchedCount} matched`, modified: `${metrics.modified} to review`, missing: `${backwardGapCount} gaps`, result: `${metrics.score}% · ${metrics.risk}` }[rowId]
+        : { aligned: `${metrics.aligned} findings`, modified: `${metrics.modified} clauses`, missing: `${metrics.missing} clauses`, result: `${metrics.score}% · ${metrics.risk}` }[rowId];
     }
     if (columnId === 'standard') {
       return direction === 'backward'
@@ -368,7 +380,15 @@ function ClauseDetails({ record, metrics, direction, selected, onClear }) {
     return true;
   };
   const filterByColumn = (finding) => !selected.columnId.startsWith('Approved-') || finding.status === 'COMPLIANT' || finding.approved_precedent;
-  const findings = backwardStandardContext
+  const findings = direction === 'backward' && selected.columnId === 'submitted'
+    ? selected.rowId === 'aligned'
+      ? comparisonFindings.filter(finding => finding.standardMatched)
+      : selected.rowId === 'missing'
+        ? comparisonFindings.filter(finding => !finding.standardMatched)
+        : selected.rowId === 'result'
+          ? comparisonFindings
+          : sourceComparisonFindings.filter(finding => finding.status === 'MODIFIED')
+    : backwardStandardContext
     ? selected.rowId === 'aligned'
       ? comparisonFindings.filter(finding => finding.standardMatched)
       : selected.rowId === 'missing'
@@ -385,7 +405,7 @@ function ClauseDetails({ record, metrics, direction, selected, onClear }) {
       : selected.rowId === 'missing'
         ? metrics.findings.filter(finding => finding.status === 'MISSING')
         : metrics.findings.filter(finding => filterByRow(finding) && filterByColumn(finding));
-  const title = backwardStandardContext && selected.rowId === 'aligned' ? 'Standard clauses matched in new template' : backwardStandardContext && selected.rowId === 'missing' ? 'Standard clauses missing from new template' : selected.rowId === 'aligned' ? 'Matched clauses' : selected.rowId === 'result' ? 'Validation findings' : selected.rowId.charAt(0).toUpperCase() + selected.rowId.slice(1) + ' clauses';
+  const title = direction === 'backward' && selected.rowId === 'aligned' ? 'Matched clauses in New Template' : direction === 'backward' && selected.rowId === 'missing' ? 'Unmatched clauses in New Template' : selected.rowId === 'aligned' ? 'Matched clauses' : selected.rowId === 'result' ? 'Validation findings' : selected.rowId.charAt(0).toUpperCase() + selected.rowId.slice(1) + ' clauses';
   const isMatchedView = selected.rowId === 'aligned';
   return <><section className="clause-card-grid real-clause-grid"><div className="real-details-head"><div><div className="eyebrow">{record.bgReferenceId} · {record.bgType}</div><h2>{title} <span>({findings.length})</span></h2><p>{record.fileName} · {record.status.replaceAll('_', ' ')} · {record.riskLevel} risk</p></div><button className="close-details" onClick={onClear}>Close details</button></div>{findings.length ? findings.map((finding, index) => <FindingCard key={finding.id || index} finding={finding} direction={direction} isMatchedView={isMatchedView} onView={() => setDetailFinding(finding)} />) : <div className="empty-details"><div className="empty-mark"><Icon name="grid" size={22}/></div><div><strong>No findings in this view</strong><p>This comparison cell has no matching clauses in the supplied validation data.</p></div></div>}</section>{detailFinding && <FindingDetailPanel finding={detailFinding} direction={direction} isMatchedView={isMatchedView} onClose={() => setDetailFinding(null)} />}</>;
 }
